@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension
+         point="org.eclipse.linuxtools.tmf.core.analysis">
+      <module
+            analysis_module="org.eclipse.tracecompass.incubator.internal.java.analysis.core.stateprovider.JavaAnalysisModule"
+            applies_experiment="true"
+            automatic="true"
+            id="org.eclipse.tracecompass.incubator.java.analysis.core.javaanalysismodule"
+            name="Java Analysis Module">
+         <tracetype
+               applies="true"
+               class="org.eclipse.tracecompass.tmf.core.trace.experiment.TmfExperiment">
+         </tracetype>
+      </module>
+   </extension>
+
+</plugin>
