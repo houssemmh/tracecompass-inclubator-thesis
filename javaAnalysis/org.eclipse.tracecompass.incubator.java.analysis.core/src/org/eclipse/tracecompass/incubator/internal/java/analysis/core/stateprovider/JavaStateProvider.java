@@ -46,25 +46,37 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
         }
     }
 
+    class GC_struct {
+        public String name;
+        public String type;
+
+        public GC_struct(String type, String name) {
+            this.name = name;
+            this.type = type;
+        }
+    }
+
     private static final int VERSION = 1;
     private static final Long MINUS_ONE = Long.valueOf(-1);
     private final @NonNull IKernelAnalysisEventLayout fLayout;
     private ArrayList<Long> stopped_threads = new ArrayList<>();
     private HashMap<Long, ThreadInfo> threads = new HashMap<>();
     //Pile pile = null;
-    Map<Long, String> gcNames  = new HashMap<Long, String>() {
+    Map<Long, GC_struct> gcNames  = new HashMap<Long, GC_struct>() {
         private static final long serialVersionUID = -7630367047541779585L;
 
     {
-        put((long) 0, "ParallelOld"); //$NON-NLS-1$
-        put((long) 1, "SerialOld"); //$NON-NLS-1$
-        put((long) 2, "PSMarkSweep"); //$NON-NLS-1$
-        put((long) 3, "ParallelScavenge");//$NON-NLS-1$
-        put((long) 4, "DefNew");//$NON-NLS-1$
-        put((long) 5, "ParNew");//$NON-NLS-1$
-        put((long) 6, "G1New");//$NON-NLS-1$
-        put((long) 7, "ConcurrentMarkSweep");//$NON-NLS-1$
-        put((long) 8, "G1Old");//$NON-NLS-1$
+        //new gen
+        put((long) 3, new GC_struct("NewGen","ParallelScavenge"));//$NON-NLS-1$ //$NON-NLS-2$
+        put((long) 6, new GC_struct("NewGen","G1New"));//$NON-NLS-1$ //$NON-NLS-2$
+        put((long) 4, new GC_struct("NewGen","DefNew"));//$NON-NLS-1$ //$NON-NLS-2$
+        put((long) 5, new GC_struct("NewGen","ParNew"));//$NON-NLS-1$ //$NON-NLS-2$
+        //old gen
+        put((long) 0, new GC_struct("OldGen","ParallelOld")); //$NON-NLS-1$ //$NON-NLS-2$
+        put((long) 1, new GC_struct("OldGen","SerialOld")); //$NON-NLS-1$ //$NON-NLS-2$
+        put((long) 2, new GC_struct("OldGen","PSMarkSweep")); //$NON-NLS-1$ //$NON-NLS-2$
+        put((long) 7, new GC_struct("OldGen","ConcurrentMarkSweep"));//$NON-NLS-1$ //$NON-NLS-2$
+        put((long) 8, new GC_struct("OldGen","G1Old"));//$NON-NLS-1$ //$NON-NLS-2$
     }};
 
 
@@ -216,7 +228,8 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             Long pid = (Long) event.getContent().getField("context._vpid").getValue(); //$NON-NLS-1$
             Long targettid = (Long) event.getContent().getField("os_threadid").getValue(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int gcthreadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GCThreads"); //$NON-NLS-1$
+            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GC"); //$NON-NLS-1$
+            int gcthreadsQuark = ss.getQuarkRelativeAndAdd(gcQuark, "GCThreads"); //$NON-NLS-1$
             int tidQuark = ss.getQuarkRelativeAndAdd(gcthreadsQuark, targettid.toString());
             int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
             String threadname = event.getContent().getField("name").getValue().toString(); //$NON-NLS-1$
@@ -230,26 +243,35 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             //Long tid = getVtid(event);
             Long pid = (Long) event.getContent().getField("context._vpid").getValue(); //$NON-NLS-1$
             Long gdnameid = (Long) event.getContent().getField("name").getValue(); //$NON-NLS-1$
-            String gcname = gcNames.get(gdnameid);
+            GC_struct gc_struct = gcNames.get(gdnameid);
+            String gctype = gc_struct.type;
+            String gcname = gc_struct.name;
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int gcthreadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GCThreads"); //$NON-NLS-1$
-            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(gcname), gcthreadsQuark);
+            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GC"); //$NON-NLS-1$
+            int collectionsQuark = ss.getQuarkRelativeAndAdd(gcQuark, "Collections"); //$NON-NLS-1$
+            int gctypequark = ss.getQuarkRelativeAndAdd(collectionsQuark, gctype);
+            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(gcname), gctypequark);
         }
             break;
         case "jvm:report_gc_end": { //$NON-NLS-1$
             //Long tid = getVtid(event);
             Long pid = (Long) event.getContent().getField("context._vpid").getValue(); //$NON-NLS-1$
-            //String monitorName = event.getContent().getField("name").getValue().toString(); //$NON-NLS-1$
+            Long gdnameid = (Long) event.getContent().getField("name").getValue(); //$NON-NLS-1$
+            GC_struct gc_struct = gcNames.get(gdnameid);
+            String gctype = gc_struct.type;
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int gcthreadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GCThreads"); //$NON-NLS-1$
-            ss.modifyAttribute(ts, (Object) null, gcthreadsQuark);
+            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GC"); //$NON-NLS-1$
+            int collectionsQuark = ss.getQuarkRelativeAndAdd(gcQuark, "Collections"); //$NON-NLS-1$
+            int gctypequark = ss.getQuarkRelativeAndAdd(collectionsQuark, gctype);
+            ss.modifyAttribute(ts, (Object) null, gctypequark);
         }
             break;
         case "jvm:gctask_start": { //$NON-NLS-1$
             Long tid = getVtid(event);
             Long pid = (Long) event.getContent().getField("context._vpid").getValue(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int gcthreadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GCThreads"); //$NON-NLS-1$
+            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GC"); //$NON-NLS-1$
+            int gcthreadsQuark = ss.getQuarkRelativeAndAdd(gcQuark, "GCThreads"); //$NON-NLS-1$
             int tidQuark = ss.getQuarkRelativeAndAdd(gcthreadsQuark, tid.toString());
             int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
             String operationName = event.getContent().getField("name").getValue().toString(); //$NON-NLS-1$
@@ -262,7 +284,8 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             Long tid = getVtid(event);
             Long pid = (Long) event.getContent().getField("context._vpid").getValue(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int gcthreadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GCThreads"); //$NON-NLS-1$
+            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GC"); //$NON-NLS-1$
+            int gcthreadsQuark = ss.getQuarkRelativeAndAdd(gcQuark, "GCThreads"); //$NON-NLS-1$
             int tidQuark = ss.getQuarkRelativeAndAdd(gcthreadsQuark, tid.toString());
             int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
             int infoQuark = ss.getQuarkRelativeAndAdd(tidQuark, "info"); //$NON-NLS-1$
@@ -515,7 +538,6 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             //This code is analysing IO requests, we can replace it be accessing the block IO analysis
             /*
         case "block_rq_insert": { //$NON-NLS-1$
-
             Long tid = (Long) event.getContent().getField("context._tid").getValue();
             Long disk = (Long) event.getContent().getField("dev").getValue();
             Long sector = (Long) event.getContent().getField("sector").getValue();
