@@ -15,6 +15,7 @@ import static org.eclipse.tracecompass.common.core.NonNullUtils.checkNotNull;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.tracecompass.analysis.os.linux.core.trace.IKernelAnalysisEventLayout;
 import org.eclipse.tracecompass.statesystem.core.ITmfStateSystemBuilder;
+import org.eclipse.tracecompass.statesystem.core.exceptions.AttributeNotFoundException;
 //import org.eclipse.tracecompass.statesystem.core.exceptions.AttributeNotFoundException;
 import org.eclipse.tracecompass.statesystem.core.statevalue.TmfStateValue;
 import org.eclipse.tracecompass.tmf.core.event.ITmfEvent;
@@ -127,26 +128,145 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
 
         switch (name) {
         case "jvm:thread_start": { //$NON-NLS-1$
-            Long tid = getVtid(event);
-            Long pid = (Long) event.getContent().getField("context._vpid").getValue(); //$NON-NLS-1$
+            Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
+            Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            Long iscompiler = (Long) event.getContent().getField("compiler").getValue(); //$NON-NLS-1$
             String threadtype;
-            if (iscompiler == 0) {
-                threadtype = "JavaThreads"; //$NON-NLS-1$
-            } else {
-                threadtype = "CompilerThreads"; //$NON-NLS-1$
-            }
+            threadtype = "JavaThreads"; //$NON-NLS-1$
             int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, threadtype);
             int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
             int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
             String threadname = event.getContent().getField("name").getValue().toString(); //$NON-NLS-1$
             int nameQuark = ss.getQuarkRelativeAndAdd(tidQuark, "name"); //$NON-NLS-1$
             ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(threadname), nameQuark);
-            ss.modifyAttribute(ts, (Object) null, statusQuark);
+            ss.modifyAttribute(ts, (Object) TmfStateValue.newValueLong(5), statusQuark);
             threads.put(tid, new ThreadInfo(pid, threadname, threadtype));
         }
             break;
+
+        case "jvm:thread_stop": { //$NON-NLS-1$
+            Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
+            Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
+            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
+            String threadtype;
+            threadtype = "JavaThreads"; //$NON-NLS-1$
+            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, threadtype);
+            int tidQuark;
+            try {
+                tidQuark = ss.getQuarkRelative(threadsQuark, tid.toString());
+                int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
+                ss.modifyAttribute(ts, (Object) null, statusQuark);
+            } catch (AttributeNotFoundException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+            break;
+
+        case "jvm:mem__pool__gc__begin": { //$NON-NLS-1$
+            //Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
+            Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
+            String gcname = event.getContent().getField("gc_name").getValue().toString(); //$NON-NLS-1$
+            String poolname = event.getContent().getField("pool_name").getValue().toString(); //$NON-NLS-1$
+            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
+            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GC"); //$NON-NLS-1$
+            int gcnameQuark = ss.getQuarkRelativeAndAdd(gcQuark, gcname);
+            int poolquark = ss.getQuarkRelativeAndAdd(gcnameQuark, poolname);
+            ss.modifyAttribute(ts, (Object) TmfStateValue.newValueLong(2), poolquark);
+        }
+            break;
+        case "jvm:mem__pool__gc__end": { //$NON-NLS-1$
+            //Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
+            Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
+            String gcname = event.getContent().getField("gc_name").getValue().toString(); //$NON-NLS-1$
+            String poolname = event.getContent().getField("pool_name").getValue().toString(); //$NON-NLS-1$
+            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
+            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GC"); //$NON-NLS-1$
+            int gcnameQuark = ss.getQuarkRelativeAndAdd(gcQuark, gcname);
+            int poolquark = ss.getQuarkRelativeAndAdd(gcnameQuark, poolname);
+            ss.modifyAttribute(ts, (Object) null , poolquark);
+        }
+            break;
+
+        case "jvm:method__compile__begin": { //$NON-NLS-1$
+            Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
+            Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
+            String compilerName = event.getContent().getField("compilerName").getValue().toString(); //$NON-NLS-1$
+            String className = event.getContent().getField("className").getValue().toString(); //$NON-NLS-1$
+            String methodName = event.getContent().getField("methodName").getValue().toString(); //$NON-NLS-1$
+            //String signature = event.getContent().getField("signature").getValue().toString(); //$NON-NLS-1$
+            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
+            int compilerthreadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "CompilerThreads");//$NON-NLS-1$
+            int compilertypeQuark = ss.getQuarkRelativeAndAdd(compilerthreadsQuark, compilerName);
+            int compilertidQuark = ss.getQuarkRelativeAndAdd(compilertypeQuark, tid.toString());
+            int statusQuark = ss.getQuarkRelativeAndAdd(compilertidQuark, "status"); //$NON-NLS-1$
+            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(formatString(className) + ":"+ formatString(methodName)), statusQuark); //$NON-NLS-1$
+        }
+            break;
+        case "jvm:method__compile__end": { //$NON-NLS-1$
+            Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
+            Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
+            String compilerName = event.getContent().getField("compilerName").getValue().toString(); //$NON-NLS-1$
+            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
+            int compilerthreadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "CompilerThreads");//$NON-NLS-1$
+            int compilertypeQuark = ss.getQuarkRelativeAndAdd(compilerthreadsQuark, compilerName);
+            int compilertidQuark = ss.getQuarkRelativeAndAdd(compilertypeQuark, tid.toString());
+            int statusQuark = ss.getQuarkRelativeAndAdd(compilertidQuark, "status"); //$NON-NLS-1$
+            ss.modifyAttribute(ts, (Object) null, statusQuark);
+        }
+            break;
+        case "jvm:monitor__contended__enter": { //$NON-NLS-1$
+            Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
+            Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
+            String monitorName = event.getContent().getField("monitorName").getValue().toString(); //$NON-NLS-1$
+            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
+            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "JavaThreads");//$NON-NLS-1$
+            int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
+            int MonitornameQuark = ss.getQuarkRelativeAndAdd(tidQuark, "Monitor Name");//$NON-NLS-1$
+            int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status");//$NON-NLS-1$
+            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(formatString(monitorName)), MonitornameQuark);
+            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueLong(6), statusQuark);
+        }
+            break;
+        case "jvm:monitor__contended__entered": { //$NON-NLS-1$
+            Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
+            Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
+            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
+            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "JavaThreads");//$NON-NLS-1$
+            int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
+            int MonitornameQuark = ss.getQuarkRelativeAndAdd(tidQuark, "Monitor Name");//$NON-NLS-1$
+            int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status");//$NON-NLS-1$
+            ss.modifyAttribute(ts, (Object) null, MonitornameQuark);
+            ss.modifyAttribute(ts, (Object) TmfStateValue.newValueLong(5),  statusQuark);
+        }
+            break;
+        case "jvm:monitor__wait": { //$NON-NLS-1$
+            Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
+            Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
+            String monitorName = event.getContent().getField("monitorName").getValue().toString(); //$NON-NLS-1$
+            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
+            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "JavaThreads");//$NON-NLS-1$
+            int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
+            int MonitornameQuark = ss.getQuarkRelativeAndAdd(tidQuark, "Monitor Name");//$NON-NLS-1$
+            int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status");//$NON-NLS-1$
+            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(formatString(monitorName)), MonitornameQuark);
+            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueLong(4), statusQuark);
+        }
+            break;
+        case "jvm:monitor__waited": { //$NON-NLS-1$
+            Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
+            Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
+            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
+            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "JavaThreads");//$NON-NLS-1$
+            int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
+            int MonitornameQuark = ss.getQuarkRelativeAndAdd(tidQuark, "Monitor Name");//$NON-NLS-1$
+            int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status");//$NON-NLS-1$
+            ss.modifyAttribute(ts, (Object) null, MonitornameQuark);
+            ss.modifyAttribute(ts, (Object) TmfStateValue.newValueLong(5), statusQuark);
+        }
+            break;
+
+
         case "jvm:thread_status": { //$NON-NLS-1$
             Long tid = getVtid(event);
             Long pid = (Long) event.getContent().getField("context._vpid").getValue(); //$NON-NLS-1$
@@ -186,6 +306,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             threads.put(tid, new ThreadInfo(pid, threadname, "VMThreads")); //$NON-NLS-1$
         }
             break;
+
         case "jvm:vmthread_stop": { //$NON-NLS-1$
             Long pid = (Long) event.getContent().getField("context._vpid").getValue(); //$NON-NLS-1$
             String targettid = event.getContent().getField("os_threadid").getValue().toString(); //$NON-NLS-1$
@@ -240,8 +361,8 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
         }
             break;
         case "jvm:report_gc_start": { //$NON-NLS-1$
-            //Long tid = getVtid(event);
-            Long pid = (Long) event.getContent().getField("context._vpid").getValue(); //$NON-NLS-1$
+            //Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
+            Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
             Long gdnameid = (Long) event.getContent().getField("name").getValue(); //$NON-NLS-1$
             GC_struct gc_struct = gcNames.get(gdnameid);
             String gctype = gc_struct.type;
@@ -254,8 +375,8 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
         }
             break;
         case "jvm:report_gc_end": { //$NON-NLS-1$
-            //Long tid = getVtid(event);
-            Long pid = (Long) event.getContent().getField("context._vpid").getValue(); //$NON-NLS-1$
+            //Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
+            Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
             Long gdnameid = (Long) event.getContent().getField("name").getValue(); //$NON-NLS-1$
             GC_struct gc_struct = gcNames.get(gdnameid);
             String gctype = gc_struct.type;
@@ -266,6 +387,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             ss.modifyAttribute(ts, (Object) null, gctypequark);
         }
             break;
+
         case "jvm:gctask_start": { //$NON-NLS-1$
             Long tid = getVtid(event);
             Long pid = (Long) event.getContent().getField("context._vpid").getValue(); //$NON-NLS-1$
@@ -293,143 +415,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             ss.modifyAttribute(ts, (Object) null, statusQuark);
         }
             break;
-        case "jvm:method_compile_begin": { //$NON-NLS-1$
-            Long tid = getVtid(event);
-            Long pid = (Long) event.getContent().getField("context._vpid").getValue(); //$NON-NLS-1$
-            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int vmthreadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "CompilerThreads");//$NON-NLS-1$
-            int tidQuark = ss.getQuarkRelativeAndAdd(vmthreadsQuark, tid.toString());
-            int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
-            String methodName = event.getContent().getField("methodName").getValue().toString(); //$NON-NLS-1$
-            String className = event.getContent().getField("className").getValue().toString(); //$NON-NLS-1$
-            int infoQuark = ss.getQuarkRelativeAndAdd(tidQuark, "info"); //$NON-NLS-1$
-            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(className + "/" + methodName), infoQuark);//$NON-NLS-1$
-            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueLong(3), statusQuark);
-        }
-            break;
-        case "jvm:method_compile_end": { //$NON-NLS-1$
-            Long tid = getVtid(event);
-            Long pid = (Long) event.getContent().getField("context._vpid").getValue();//$NON-NLS-1$
-            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int vmthreadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "CompilerThreads");//$NON-NLS-1$
-            int tidQuark = ss.getQuarkRelativeAndAdd(vmthreadsQuark, tid.toString());
-            int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
-            int infoQuark = ss.getQuarkRelativeAndAdd(tidQuark, "info"); //$NON-NLS-1$
-            ss.modifyAttribute(ts, (Object) null, infoQuark);
-            ss.modifyAttribute(ts, (Object) null, statusQuark);
-        }
-            break;
-        case "jvm:contended_enter": { //$NON-NLS-1$
-            Long tid = getVtid(event);
-            Long pid = (Long) event.getContent().getField("context._vpid").getValue();//$NON-NLS-1$
-            String monitorName = event.getContent().getField("name").getValue().toString(); //$NON-NLS-1$
-            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "JavaThreads");//$NON-NLS-1$
-            int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
-            int infoQuark = ss.getQuarkRelativeAndAdd(tidQuark, "Contended");//$NON-NLS-1$
-            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(monitorName), infoQuark);
-            /*Long pid = (Long) event.getContent().getField("context._vpid").getValue();
-            String monitorName = event.getContent().getField("name").getValue().toString(); //$NON-NLS-1$
-            Long ptr = (Long) event.getContent().getField("ptr").getValue();
-            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int contendedQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Contention");
-            int monitorQuark = ss.getQuarkRelativeAndAdd(contendedQuark, ptr.toString());
-            int nameQuark = ss.getQuarkRelativeAndAdd(monitorQuark, "name"); //$NON-NLS-1$
-            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(monitorName), nameQuark);
-            int threadsQuark = ss.getQuarkRelativeAndAdd(monitorQuark, "threads"); //$NON-NLS-1$
-            int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
-            String threadName;
-            ThreadInfo pair = threads.get(tid);
-            if (pair != null) {
-                threadName = pair.name;
-            } else {
-                threadName = tid.toString();
-            }
-            int threadNameQuark = ss.getQuarkRelativeAndAdd(tidQuark, "name"); //$NON-NLS-1$
-            int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
-            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueLong(4), statusQuark);
 
-            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(threadName), threadNameQuark);
-        */
-        }
-            break;
-        case "jvm:contended_entered": { //$NON-NLS-1$
-            /*Long tid = getVtid(event);
-            Long pid = (Long) event.getContent().getField("context._vpid").getValue();
-            Long ptr = (Long) event.getContent().getField("ptr").getValue();
-            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int contendedQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Contention");
-            int monitorQuark = ss.getQuarkRelativeAndAdd(contendedQuark, ptr.toString());
-            int threadsQuark = ss.getQuarkRelativeAndAdd(monitorQuark, "threads"); //$NON-NLS-1$
-            int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
-            int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
-            ss.modifyAttribute(ts, (Object) null, statusQuark);
-            */
-            Long tid = getVtid(event);
-            Long pid = (Long) event.getContent().getField("context._vpid").getValue();//$NON-NLS-1$
-            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "JavaThreads");//$NON-NLS-1$
-            int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
-            int infoQuark = ss.getQuarkRelativeAndAdd(tidQuark, "Contended");//$NON-NLS-1$
-            ss.modifyAttribute(ts, (Object) null, infoQuark);
-        }
-            break;
-        case "jvm:monitor_wait": { //$NON-NLS-1$
-            Long tid = getVtid(event);
-            Long pid = (Long) event.getContent().getField("context._vpid").getValue();//$NON-NLS-1$
-            String monitorName = event.getContent().getField("name").getValue().toString(); //$NON-NLS-1$
-            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "JavaThreads");//$NON-NLS-1$
-            int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
-            int infoQuark = ss.getQuarkRelativeAndAdd(tidQuark, "Monitor");//$NON-NLS-1$
-            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(monitorName), infoQuark);
-            /*Long tid = getVtid(event);
-            Long pid = (Long) event.getContent().getField("context._vpid").getValue();
-            String monitorName = event.getContent().getField("name").getValue().toString(); //$NON-NLS-1$
-            Long ptr = (Long) event.getContent().getField("ptr").getValue();
-            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int contendedQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Monitor");
-            int monitorQuark = ss.getQuarkRelativeAndAdd(contendedQuark, ptr.toString());
-            int nameQuark = ss.getQuarkRelativeAndAdd(monitorQuark, "name"); //$NON-NLS-1$
-            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(monitorName), nameQuark);
-            int threadsQuark = ss.getQuarkRelativeAndAdd(monitorQuark, "threads"); //$NON-NLS-1$
-            int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
-            String threadName;
-            ThreadInfo pair = threads.get(tid);
-            if (pair != null) {
-                threadName = pair.name;
-            } else {
-                threadName = tid.toString();
-            }
-            int threadNameQuark = ss.getQuarkRelativeAndAdd(tidQuark, "name"); //$NON-NLS-1$
-            int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
-            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueLong(4), statusQuark);
-            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(threadName), threadNameQuark);
-        */
-        }
-            break;
-        case "jvm:monitor_waited": { //$NON-NLS-1$
-            Long tid = getVtid(event);
-            Long pid = (Long) event.getContent().getField("context._vpid").getValue();//$NON-NLS-1$
-            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "JavaThreads");//$NON-NLS-1$
-            int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
-            int infoQuark = ss.getQuarkRelativeAndAdd(tidQuark, "Monitor");//$NON-NLS-1$
-            ss.modifyAttribute(ts, (Object) null, infoQuark);
-            /*
-            Long tid = getVtid(event);
-            Long pid = (Long) event.getContent().getField("context._vpid").getValue();
-            Long ptr = (Long) event.getContent().getField("ptr").getValue();
-            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int contendedQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Monitor");
-            int monitorQuark = ss.getQuarkRelativeAndAdd(contendedQuark, ptr.toString());
-            int threadsQuark = ss.getQuarkRelativeAndAdd(monitorQuark, "threads"); //$NON-NLS-1$
-            int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
-            int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
-            ss.modifyAttribute(ts, (Object) null, statusQuark);
-            */
-        }
-            break;
             /*
         case "jvm:notify":
         case "jvm:notifyAll": { //$NON-NLS-1$
@@ -681,6 +667,23 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
 //        }
 //    }
 
+
+    /**
+     * @param strValue
+     *  string
+     * @return
+     *  string
+     */
+
+    private static String formatString(String text)
+    {
+        String mytxt;
+        mytxt = text;
+        // strips off all non-ASCII characters
+        mytxt = mytxt.replaceAll("[^a-zA-Z0-9\\/]", ""); //$NON-NLS-1$ //$NON-NLS-2$
+
+        return mytxt.trim();
+    }
 
     @Override
     public ITmfStateProvider getNewInstance() {
