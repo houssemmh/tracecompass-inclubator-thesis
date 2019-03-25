@@ -93,7 +93,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
     public JavaStateProvider(@NonNull ITmfTrace trace, IKernelAnalysisEventLayout layout) {
         super(trace, "Ust:Java"); //$NON-NLS-1$
         fLayout = layout;
-        //threads.put(Long.valueOf(8644), new ThreadInfo(Long.valueOf(8641), "Main Thread", "JavaThreads"));
+        //threads.put(Long.valueOf(8644), new ThreadInfo(Long.valueOf(8641), "Main Thread", "Threads"));
     }
 
     private static Long getVtid(ITmfEvent event) {
@@ -130,16 +130,33 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
         case "jvm:thread_start": { //$NON-NLS-1$
             Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
             Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
+            String threadname = event.getContent().getField("name").getValue().toString(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
             String threadtype;
-            threadtype = "JavaThreads"; //$NON-NLS-1$
+            threadtype = "Threads"; //$NON-NLS-1$
             int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, threadtype);
             int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
             int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
-            String threadname = event.getContent().getField("name").getValue().toString(); //$NON-NLS-1$
             int nameQuark = ss.getQuarkRelativeAndAdd(tidQuark, "name"); //$NON-NLS-1$
             ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(threadname), nameQuark);
             ss.modifyAttribute(ts, (Object) TmfStateValue.newValueLong(5), statusQuark);
+            threads.put(tid, new ThreadInfo(pid, threadname, threadtype));
+        }
+            break;
+
+        case "jvm:statedump_java_thread": { //$NON-NLS-1$
+            Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
+            Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
+            String threadname = event.getContent().getField("threadName").getValue().toString(); //$NON-NLS-1$
+            int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
+            String threadtype;
+            threadtype = "Threads"; //$NON-NLS-1$
+            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, threadtype);
+            int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
+            int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
+            int nameQuark = ss.getQuarkRelativeAndAdd(tidQuark, "name"); //$NON-NLS-1$
+            ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(threadname), nameQuark);
+            ss.modifyAttribute(ts, (Object) null, statusQuark);
             threads.put(tid, new ThreadInfo(pid, threadname, threadtype));
         }
             break;
@@ -149,7 +166,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
             String threadtype;
-            threadtype = "JavaThreads"; //$NON-NLS-1$
+            threadtype = "Threads"; //$NON-NLS-1$
             int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, threadtype);
             int tidQuark;
             try {
@@ -169,7 +186,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             String gcname = event.getContent().getField("gc_name").getValue().toString(); //$NON-NLS-1$
             String poolname = event.getContent().getField("pool_name").getValue().toString(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GC"); //$NON-NLS-1$
+            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Garbage Collection"); //$NON-NLS-1$
             int gcnameQuark = ss.getQuarkRelativeAndAdd(gcQuark, gcname);
             int poolquark = ss.getQuarkRelativeAndAdd(gcnameQuark, poolname);
             ss.modifyAttribute(ts, (Object) TmfStateValue.newValueLong(2), poolquark);
@@ -181,7 +198,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             String gcname = event.getContent().getField("gc_name").getValue().toString(); //$NON-NLS-1$
             String poolname = event.getContent().getField("pool_name").getValue().toString(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GC"); //$NON-NLS-1$
+            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Garbage Collection"); //$NON-NLS-1$
             int gcnameQuark = ss.getQuarkRelativeAndAdd(gcQuark, gcname);
             int poolquark = ss.getQuarkRelativeAndAdd(gcnameQuark, poolname);
             ss.modifyAttribute(ts, (Object) null , poolquark);
@@ -196,9 +213,10 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             String methodName = event.getContent().getField("methodName").getValue().toString(); //$NON-NLS-1$
             //String signature = event.getContent().getField("signature").getValue().toString(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int compilerthreadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "CompilerThreads");//$NON-NLS-1$
+            int compilerthreadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "JIT Compilation");//$NON-NLS-1$
             int compilertypeQuark = ss.getQuarkRelativeAndAdd(compilerthreadsQuark, compilerName);
-            int compilertidQuark = ss.getQuarkRelativeAndAdd(compilertypeQuark, tid.toString());
+            String thread_name_or_tid = get_thread_name_or_tid(tid);
+            int compilertidQuark = ss.getQuarkRelativeAndAdd(compilertypeQuark, thread_name_or_tid);
             int statusQuark = ss.getQuarkRelativeAndAdd(compilertidQuark, "status"); //$NON-NLS-1$
             ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(formatString(className) + ":"+ formatString(methodName)), statusQuark); //$NON-NLS-1$
         }
@@ -208,9 +226,10 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
             String compilerName = event.getContent().getField("compilerName").getValue().toString(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int compilerthreadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "CompilerThreads");//$NON-NLS-1$
+            int compilerthreadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "JIT Compilation");//$NON-NLS-1$
             int compilertypeQuark = ss.getQuarkRelativeAndAdd(compilerthreadsQuark, compilerName);
-            int compilertidQuark = ss.getQuarkRelativeAndAdd(compilertypeQuark, tid.toString());
+            String thread_name_or_tid = get_thread_name_or_tid(tid);
+            int compilertidQuark = ss.getQuarkRelativeAndAdd(compilertypeQuark, thread_name_or_tid);
             int statusQuark = ss.getQuarkRelativeAndAdd(compilertidQuark, "status"); //$NON-NLS-1$
             ss.modifyAttribute(ts, (Object) null, statusQuark);
         }
@@ -220,7 +239,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
             String monitorName = event.getContent().getField("monitorName").getValue().toString(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "JavaThreads");//$NON-NLS-1$
+            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Threads");//$NON-NLS-1$
             int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
             int MonitornameQuark = ss.getQuarkRelativeAndAdd(tidQuark, "Monitor Name");//$NON-NLS-1$
             int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status");//$NON-NLS-1$
@@ -232,7 +251,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
             Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "JavaThreads");//$NON-NLS-1$
+            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Threads");//$NON-NLS-1$
             int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
             int MonitornameQuark = ss.getQuarkRelativeAndAdd(tidQuark, "Monitor Name");//$NON-NLS-1$
             int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status");//$NON-NLS-1$
@@ -245,7 +264,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
             String monitorName = event.getContent().getField("monitorName").getValue().toString(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "JavaThreads");//$NON-NLS-1$
+            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Threads");//$NON-NLS-1$
             int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
             int MonitornameQuark = ss.getQuarkRelativeAndAdd(tidQuark, "Monitor Name");//$NON-NLS-1$
             int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status");//$NON-NLS-1$
@@ -257,7 +276,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             Long tid = (Long) event.getContent().getField("tid").getValue(); //$NON-NLS-1$
             Long pid = (Long) event.getContent().getField("pid").getValue(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "JavaThreads");//$NON-NLS-1$
+            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Threads");//$NON-NLS-1$
             int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
             int MonitornameQuark = ss.getQuarkRelativeAndAdd(tidQuark, "Monitor Name");//$NON-NLS-1$
             int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status");//$NON-NLS-1$
@@ -274,7 +293,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
                 break;
             }
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "JavaThreads"); //$NON-NLS-1$
+            int threadsQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Threads"); //$NON-NLS-1$
             int tidQuark = ss.getQuarkRelativeAndAdd(threadsQuark, tid.toString());
             int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
             Long status = (Long) event.getContent().getField("status").getValue(); //$NON-NLS-1$
@@ -287,7 +306,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
 
             ThreadInfo pair = threads.get(tid);
             if (pair == null) {
-                threads.put(tid, new ThreadInfo(pid, tid.toString(), "JavaThreads")); //$NON-NLS-1$
+                threads.put(tid, new ThreadInfo(pid, tid.toString(), "Threads")); //$NON-NLS-1$
             }
 
         }
@@ -349,15 +368,15 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             Long pid = (Long) event.getContent().getField("context._vpid").getValue(); //$NON-NLS-1$
             Long targettid = (Long) event.getContent().getField("os_threadid").getValue(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GC"); //$NON-NLS-1$
-            int gcthreadsQuark = ss.getQuarkRelativeAndAdd(gcQuark, "GCThreads"); //$NON-NLS-1$
+            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Garbage Collection"); //$NON-NLS-1$
+            int gcthreadsQuark = ss.getQuarkRelativeAndAdd(gcQuark, "Garbage Collection"); //$NON-NLS-1$
             int tidQuark = ss.getQuarkRelativeAndAdd(gcthreadsQuark, targettid.toString());
             int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
             String threadname = event.getContent().getField("name").getValue().toString(); //$NON-NLS-1$
             int nameQuark = ss.getQuarkRelativeAndAdd(tidQuark, "name"); //$NON-NLS-1$
             ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(threadname), nameQuark);
             ss.modifyAttribute(ts, (Object) null, statusQuark);
-            threads.put(targettid, new ThreadInfo(pid, threadname, "GCThreads")); //$NON-NLS-1$
+            threads.put(targettid, new ThreadInfo(pid, threadname, "Garbage Collection")); //$NON-NLS-1$
         }
             break;
         case "jvm:report_gc_start": { //$NON-NLS-1$
@@ -368,7 +387,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             String gctype = gc_struct.type;
             String gcname = gc_struct.name;
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GC"); //$NON-NLS-1$
+            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Garbage Collection"); //$NON-NLS-1$
             int collectionsQuark = ss.getQuarkRelativeAndAdd(gcQuark, "Collections"); //$NON-NLS-1$
             int gctypequark = ss.getQuarkRelativeAndAdd(collectionsQuark, gctype);
             ss.modifyAttribute(ts, (Object)TmfStateValue.newValueString(gcname), gctypequark);
@@ -381,7 +400,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             GC_struct gc_struct = gcNames.get(gdnameid);
             String gctype = gc_struct.type;
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GC"); //$NON-NLS-1$
+            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Garbage Collection"); //$NON-NLS-1$
             int collectionsQuark = ss.getQuarkRelativeAndAdd(gcQuark, "Collections"); //$NON-NLS-1$
             int gctypequark = ss.getQuarkRelativeAndAdd(collectionsQuark, gctype);
             ss.modifyAttribute(ts, (Object) null, gctypequark);
@@ -392,8 +411,8 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             Long tid = getVtid(event);
             Long pid = (Long) event.getContent().getField("context._vpid").getValue(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GC"); //$NON-NLS-1$
-            int gcthreadsQuark = ss.getQuarkRelativeAndAdd(gcQuark, "GCThreads"); //$NON-NLS-1$
+            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Garbage Collection"); //$NON-NLS-1$
+            int gcthreadsQuark = ss.getQuarkRelativeAndAdd(gcQuark, "Garbage Collection"); //$NON-NLS-1$
             int tidQuark = ss.getQuarkRelativeAndAdd(gcthreadsQuark, tid.toString());
             int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
             String operationName = event.getContent().getField("name").getValue().toString(); //$NON-NLS-1$
@@ -406,8 +425,8 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
             Long tid = getVtid(event);
             Long pid = (Long) event.getContent().getField("context._vpid").getValue(); //$NON-NLS-1$
             int pidQuark = ss.getQuarkAbsoluteAndAdd(pid.toString());
-            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "GC"); //$NON-NLS-1$
-            int gcthreadsQuark = ss.getQuarkRelativeAndAdd(gcQuark, "GCThreads"); //$NON-NLS-1$
+            int gcQuark = ss.getQuarkRelativeAndAdd(pidQuark, "Garbage Collection"); //$NON-NLS-1$
+            int gcthreadsQuark = ss.getQuarkRelativeAndAdd(gcQuark, "Garbage Collection"); //$NON-NLS-1$
             int tidQuark = ss.getQuarkRelativeAndAdd(gcthreadsQuark, tid.toString());
             int statusQuark = ss.getQuarkRelativeAndAdd(tidQuark, "User Status"); //$NON-NLS-1$
             int infoQuark = ss.getQuarkRelativeAndAdd(tidQuark, "info"); //$NON-NLS-1$
@@ -488,7 +507,7 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
                 ThreadInfo target = threads.get(targettid);
                 if (target != null) {
                     switch (target.type) {
-                    case "JavaThreads": //$NON-NLS-1$
+                    case "Threads": //$NON-NLS-1$
                         ss.modifyAttribute(ts, (Object) null, cpustatusQ);
                         ss.modifyAttribute(ts + 1, (Object)TmfStateValue.newValueLong(1001), cpustatusQ);
                         break;
@@ -496,11 +515,11 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
                         ss.modifyAttribute(ts, (Object) null, cpustatusQ);
                         ss.modifyAttribute(ts + 1, (Object)TmfStateValue.newValueLong(1002), cpustatusQ);
                         break;
-                    case "GCThreads": //$NON-NLS-1$
+                    case "Garbage Collection": //$NON-NLS-1$
                         ss.modifyAttribute(ts, (Object) null, cpustatusQ);
                         ss.modifyAttribute(ts + 1, (Object)TmfStateValue.newValueLong(1003), cpustatusQ);
                         break;
-                    case "CompilerThreads": //$NON-NLS-1$
+                    case "JIT Compilation": //$NON-NLS-1$
                         ss.modifyAttribute(ts, (Object) null, cpustatusQ);
                         ss.modifyAttribute(ts + 1, (Object)TmfStateValue.newValueLong(1004), cpustatusQ);
                         break;
@@ -683,6 +702,18 @@ public class JavaStateProvider extends AbstractTmfStateProvider {
         mytxt = mytxt.replaceAll("[^a-zA-Z0-9\\/]", ""); //$NON-NLS-1$ //$NON-NLS-2$
 
         return mytxt.trim();
+    }
+
+    private  String get_thread_name_or_tid(Long tid)
+    {
+        String name_or_tid;
+        ThreadInfo pair = threads.get(tid);
+        if (pair != null) {
+            name_or_tid = pair.name;
+        } else {
+            name_or_tid = tid.toString();
+        }
+        return name_or_tid;
     }
 
     @Override
